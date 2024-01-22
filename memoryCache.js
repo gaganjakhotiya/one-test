@@ -52,14 +52,27 @@ module.exports = class MemoryCache {
         }
 
         const node = this._nodesByKey.get(key);
+
+        if (node === undefined) {
+            return { cached: false };
+        }
+
+        // console.log("DEBUG1", node);
+        // console.log("DEBUG2", node.value);
+        // console.log("DEBUG3", node.value.value);
+
         const item = node.value;
 
         // TODO: Check for expiry, and clear if expired.
 
         // Mark as most recently read.
-        this._mostRecentlyRead.moveToBack(node);
+        // console.log("BEF", this._mostRecentlyRead);
+        // if (this._mostRecentlyRead.get())
 
-        return { cached: false, value: item.value };
+        this._mostRecentlyRead.moveToFront(node);
+        // console.log("AFT", this._mostRecentlyRead);
+
+        return { cached: true, value: item.value };
     }
 
     /**
@@ -74,14 +87,18 @@ module.exports = class MemoryCache {
         // Add item.
         // TODO: Store expiry too, and clear when expired.
         const item = { key, value };
+        // console.log("HIT1", this._maxItems)
         this._mostRecentlyRead.addToFront(item);
+        // console.log("HIT2", this._nodesByKey.size)
         this._nodesByKey.set(key, this._mostRecentlyRead.head);
+        // console.log("HIT3", this._nodesByKey.size, this._mostRecentlyRead.head.value, this._mostRecentlyRead.tail.value)
 
         // If we're over capacity, evict least recently read items.
         while (this._maxItems > 0 && this._nodesByKey.size > this._maxItems) {
             const oldestItem = this._mostRecentlyRead.tail.value;
             await this.clear(oldestItem.key);
         }
+        console.log("HIT4", this._nodesByKey.size)
     }
 
     /**
@@ -91,6 +108,7 @@ module.exports = class MemoryCache {
      * @param {string} key
      */
     async clear(key) {
+        console.log("CLEAR", key)
         // Do we have this key in our cache? Noop if not.
         if (!this._nodesByKey.has(key)) {
             return false;
